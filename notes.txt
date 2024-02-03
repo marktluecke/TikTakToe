@@ -1,0 +1,350 @@
+use std::io;
+use std::error::Error;
+use std::fmt;
+
+
+#[derive(Debug)]
+struct Board {
+    field: [[i8; 3]; 3],
+    ended: bool,
+    winner: i8,
+    c_player: bool,
+}
+
+#[derive(Debug)]
+struct SpaceOccupied {
+    details: String,
+}
+
+impl fmt::Display for SpaceOccupied {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f,"{}",self.details)
+    }
+}
+impl SpaceOccupied {
+    fn new(msg: &str) -> SpaceOccupied {
+        SpaceOccupied{details: msg.to_string()}
+    }
+}
+
+impl Error for SpaceOccupied {
+    fn description(&self) -> &str {
+        &self.details
+    }
+}
+impl Board {
+    fn new() -> Self {
+        return Self {
+            field: [[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+            ended: false,
+            winner: 0,
+            c_player: true,
+        };
+    }
+    fn make_move(&mut self, index: i8) -> Result<Board, SpaceOccupied> {
+        let y: usize = {index / 3} as usize;
+        let x: usize = {index % 3} as usize;
+
+        let mut return_field = Board {
+            field: self.field,
+            ended: self.ended,
+            winner: self.winner,
+            c_player: self.c_player
+            };
+
+        if self.c_player {
+            if self.field[y][x] != 0 {
+                return Err(SpaceOccupied::new("Space already occupied!"));
+            }
+            return_field.field[y][x] = 1;
+            return_field.c_player = false;
+
+        } else {
+            if self.field[y][x] != 0 {
+                return Err(SpaceOccupied::new("Space already occupied!"));
+            }
+            return_field.field[y][x] = -1;
+            return_field.c_player = true;
+        }
+        return_field.check_for_end();
+        Ok(return_field)
+    }
+
+    fn get_moves(&mut self) -> Vec<i8> {
+        let mut moves: Vec<i8> = Vec::new();
+
+        for (y, row) in self.field.iter().enumerate() { 
+            for (x, col) in row.iter().enumerate() {
+                if *col == 0 {
+                    moves.push((y * 3 + x) as i8); //here
+                }
+            }
+        }
+        return moves;
+    }
+    
+    fn check_for_end(&mut self) {
+        if self.get_moves().is_empty() {
+            self.ended = true;
+        }
+        self.check_for_win();
+    }
+
+    fn check_for_win(&mut self) {
+        for num in 0..3 {
+            let start = self.field[0][num];
+            if start == self.field[1][num] && start == self.field[2][num] {
+                self.winner = start;
+            }
+        }
+    
+        for num in 0..3 {
+            let start = self.field[num][0];
+            if start == self.field[num][1] && start == self.field[num][2] {
+                self.winner = start;
+            }
+        }
+    
+        if self.field[0][0] == self.field[1][1] && self.field[0][0] == self.field[2][2] {
+            self.winner = self.field[0][0];
+        }
+        if self.field[0][2] == self.field[1][1] && self.field[0][2] == self.field[2][0] {
+            self.winner = self.field[0][2];
+        }
+    }
+
+    fn print(&self) {
+        let symbol_empty: char = '⬜';
+        let symbol_circle: &str = " O";
+        let symbol_cross: &str = " X";
+
+        let mut out = String::from("");
+
+        for (_i, row) in self.field.iter().enumerate() { 
+            for (_y, col) in row.iter().enumerate() {
+                if *col == 0 {
+                    out.push(symbol_empty);
+                } else if *col == -1 {
+                    out.push_str(&symbol_circle);
+                } else if *col == 1 {
+                    out.push_str(&symbol_cross);
+                }
+            }
+            out.push_str("\n"); 
+        }
+        println!("{}", out);
+    }
+}
+
+enum MinimaxRet {
+    Score(i8),
+    ScoreMove((i8, i8)),
+}
+
+fn get_user_input() -> i8 {
+    loop {
+        println!("Select field: ");
+
+        let mut index = String::from("");
+
+        io::stdin().read_line(&mut index).expect("Failed to read line!");
+        let index: i8 = index.trim().parse().expect("Not a number!");
+
+        if index < 9 {
+            return index;
+        } else {
+            println!("Index must be between 0 and 8!")
+        }
+    }
+}
+
+fn print_field(field: &[[i8; 3]; 3]) {
+    let symbol_empty: char = '⬜';
+    let symbol_circle: &str = " O";
+    let symbol_cross: &str = " X";
+
+    let mut out = String::from("");
+
+    for (_i, row) in field.iter().enumerate() { 
+        for (_y, col) in row.iter().enumerate() {
+            if *col == 0 {
+                out.push(symbol_empty);
+            } else if *col == -1 {
+                out.push_str(&symbol_circle);
+            } else if *col == 1 {
+                out.push_str(&symbol_cross);
+            }
+        }
+        out.push_str("\n"); 
+    }
+    println!("{}", out);
+}
+
+fn check_for_win(field: &[[i8; 3]; 3]) -> i8 {
+    for num in 0..3 {
+        let start = field[0][num];
+        if start == field[0][num] && start == field[2][num] {
+            return start;
+        }
+    }
+
+    for num in 0..3 {
+        let start = field[num][0];
+        if start == field[num][1] && start == field[num][2] {
+            return start;
+        }
+    }
+
+    if field[0][0] == field[1][1] && field[0][0] == field[2][2] {
+        return field[0][0];
+    }
+    if field[0][2] == field[1][1] && field[0][3] == field[2][0] {
+        return field[0][2];
+    }
+    return 0;
+}
+
+fn get_turn(field: &[[i8; 3]; 3]) -> bool {
+    let mut x_count: i8 = 0;
+    let mut o_count: i8 = 0; 
+    let mut retval: bool = true;
+    for element in field.iter().flat_map(|r| r.iter()) {
+        if *element == 1 {
+            x_count += 1;
+        } else if *element == -1 {
+            o_count += 1;
+        }
+        if x_count > o_count {
+            retval = false;
+        }
+    }
+    return retval;
+}
+
+fn get_next_moves(field: &[[i8; 3]; 3]) -> Vec<[[i8; 3]; 3]> {
+    let player: bool = get_turn(&field);
+
+    let mut list_of_fields: Vec<[[i8; 3]; 3]> = Vec::new();
+
+    for (y, row) in field.iter().enumerate() { 
+        for (x, col) in row.iter().enumerate() {
+            if *col == 0 {
+                let mut new_field = field.clone();
+
+                if player {new_field[y][x] = 1}
+                else {new_field[y][x] = -1}
+
+                list_of_fields.push(new_field);
+            }
+        }
+    }
+    return list_of_fields;
+}
+
+fn select_next_move(field: &[[i8; 3]; 3]) {
+    let all_moves = get_next_moves(&field);
+    println!("{:?}", all_moves);
+}
+    
+fn score(field: &mut Board) -> i8 {
+    field.check_for_win(); 
+
+    if field.c_player && field.winner == 1 {
+        return 10;
+    } else if !field.c_player && field.winner == -1 {
+        return 10;
+    }
+
+    if !field.c_player && field.winner == 1 {
+        return -10;
+    } else if field.c_player && field.winner == -1 {
+        return -10;
+    }
+//    if field.winner == 1 {
+//        if field.c_player {
+//            return 10;
+//        } else {
+//            return -10;
+//        }
+//    } else if field.winner  == -1 {
+//        if field.c_player {
+//            return -10;
+//        } else {
+//            return 10;
+//        }
+//    }
+    return 0;
+}
+
+
+fn minimax(field: &mut Board) -> MinimaxRet {
+    field.check_for_end();
+    if field.ended {return MinimaxRet::Score(score(field));}
+
+    let mut scores: Vec<i8> = Vec::new();
+    let mut next_moves: Vec<i8> = Vec::new();
+
+    for possible_move in field.get_moves().iter() {
+        let mut possible_game = field.make_move(*possible_move).expect("Error in Logic: Field already in use!");
+        match minimax(&mut possible_game) {
+            MinimaxRet::Score(score) => {scores.push(score);},
+            MinimaxRet::ScoreMove((score, _b_move)) => {scores.push(score);},
+        }
+        next_moves.push(*possible_move);
+        //println!("{:?}", scores);
+        //println!("{:?}", next_moves);
+        
+    }
+
+    
+
+    if field.c_player {
+        let max_score = match scores.iter().max() {
+            Some(max) => *max,
+            _ => {println!("awd");0},
+        };
+        let max_score_index = scores.iter().position(|&r| r == max_score).unwrap(); 
+        return MinimaxRet::ScoreMove((max_score, next_moves[max_score_index]));
+             
+    } else {
+        let min_score = match scores.iter().min() {
+            Some(min) => *min,
+            _ => {println!("awd");0},
+        };
+        let min_score_index = scores.iter().position(|&r| r == min_score).unwrap(); 
+        //println!("{:?}", scores);
+        //println!("{:?}", next_moves);
+        return MinimaxRet::ScoreMove((min_score, next_moves[min_score_index]));
+    }
+}
+
+fn main() {
+    let mut field: Board = Board::new();
+    //let mut field: Board = Board {field:[[0, 0, 1], [1, 0, 0], [1, -1, -1]], ended: false, winner: 0, c_player: false};
+    //let ret = minimax(&mut field);
+    println!("Play TikTakToe: ");
+
+    loop {
+        field.print();
+        if field.c_player {
+            let index = get_user_input();
+            field = field.make_move(index).expect("Error");
+            println!("{:?}", field);
+
+        } else {
+            match minimax(&mut field) {
+                MinimaxRet::Score(_score) => (),
+                MinimaxRet::ScoreMove((score, b_move)) => {
+                    field = field.make_move(b_move).expect("Error"); println!("{:?}", score)
+                },
+            }
+            
+        }
+        
+        match field.winner {
+            -1 => {println!("O won!"); field.print(); break},
+            1 => {println!("X won!"); field.print(); break},
+            _ => (),
+        }
+    }
+}
