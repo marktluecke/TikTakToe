@@ -263,7 +263,7 @@ fn score(field: &mut Board) -> i8 {
     if field.winner == 0 {
         return 0;
     } else if field.bot_player == field.winner {
-        return 11 - field.get_depth();            // mit jeweils 20 gewinnt bot als o
+        return 11 - field.get_depth();            
     } else if field.bot_player != field.winner {
         return -11 + field.get_depth();
     }
